@@ -1,2 +1,1 @@
-# archilab
-Lab assignments for ECE5755: Computer Architecture (Cornell Tech)
+# Assignment 2: Optimize the performance of the ML operations using tiling and blocking
