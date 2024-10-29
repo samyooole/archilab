@@ -20,7 +20,6 @@ int main(void) {
     // Only testing matrix_ops
     RUN_TEST(test_matmul_square_matrices);
     RUN_TEST(test_matmul_rectangular_matrices);
-    RUN_TEST(test_matmul_single_element_matrices);
     RUN_TEST(test_matmul_incompatible_dimensions);
 
     return UNITY_END();

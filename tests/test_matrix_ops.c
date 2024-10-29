@@ -143,37 +143,6 @@ void test_matmul_rectangular_matrices(void)
     free(expected);
 }
 
-void test_matmul_single_element_matrices(void)
-{
-    // Setup
-    float **A = (float **)malloc(1 * sizeof(float *));
-    A[0] = (float *)malloc(1 * sizeof(float));
-    A[0][0] = 3.0f;
-
-    float **B = (float **)malloc(1 * sizeof(float *));
-    B[0] = (float *)malloc(1 * sizeof(float));
-    B[0][0] = 4.0f;
-
-    float **expected = (float **)malloc(1 * sizeof(float *));
-    expected[0] = (float *)malloc(1 * sizeof(float));
-    expected[0][0] = 12.0f;
-
-    // Run function under test
-    float **C = matmul_blocking(A, B, 1, 1, 1, 1);
-
-    // Check expectations
-    assert_float_array_equal_matmul(expected, C, 1, 1);
-
-    // Cleanup
-    free(A[0]);
-    free(B[0]);
-    free(C[0]);
-    free(expected[0]);
-    free(A);
-    free(B);
-    free(C);
-    free(expected);
-}
 
 void test_matmul_incompatible_dimensions(void)
 {

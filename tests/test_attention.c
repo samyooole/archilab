@@ -14,14 +14,6 @@ float **allocate_matrix(int rows, int cols)
     return matrix;
 }
 
-void free_matrix(float **matrix, int rows)
-{
-    for (int i = 0; i < rows; i++)
-    {
-        free(matrix[i]);
-    }
-    free(matrix);
-}
 
 // Test functions for scaled dot-product attention and multi-head attention
 void test_scaled_dot_product_attention(void)

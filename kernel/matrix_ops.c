@@ -1,4 +1,5 @@
 #include "matrix_ops.h"
+#include "string.h"
 
 #ifndef BLOCK_SIZE_I
 #define BLOCK_SIZE_I 169
@@ -40,12 +41,15 @@ float **matmul(float **A, float **B, int A_rows, int A_cols, int B_rows, int B_c
 }
 
 // free matrix memory
+/*
 void free_matrix(float **matrix, int rows) {
     for (int i = 0; i < rows; i++) {
         free(matrix[i]);
     }
     free(matrix);
 }
+*/
+
 
 
 // Matmul with blocking optimization
@@ -85,35 +89,35 @@ float **matmul_blocking(float **A, float **B, int A_rows, int A_cols, int B_rows
     // allocate output matrix C
     float **C = (float **)malloc(A_rows * sizeof(float *));
     for (int i = 0; i < A_rows; i++) {
-        C[i] = (float *)malloc(B_cols * sizeof(float));  // Initialize to 0
+        C[i] = (float *)malloc(B_cols * sizeof(float));  // init to 0
     }
 
 
-    int M_T = A_rows/2;
-    int N_T = B_cols/2;
+    int M_T = 64;
+    int N_T = 64;
     int K = A_cols;
 
 
-    // Handle the case where dimensions are odd
+    // handle the case where dimensions are odd
     int row_remainder = A_rows % M_T;
     int col_remainder = B_cols % N_T;
 
     // allocate local tiles
     float *tile_C = (float *)malloc(M_T * N_T * sizeof(float));
 
-    // Main tiled multiplication
+    // loop over the integer number of tiles (main case: for the max integer # of tiles that can fit under the current  size)
     for (int mm = 0; mm < A_rows / M_T; mm++) {
         for (int nn = 0; nn < B_cols / N_T; nn++) {
-            // Clear tile_C for accumulation
+
             memset(tile_C, 0, M_T * N_T * sizeof(float));
             
-            // Calculate tile boundaries
+            // calculate tile boundaries
             int row_start = mm * M_T;
             int row_end = (mm + 1) * M_T;
             int col_start = nn * N_T;
             int col_end = (nn + 1) * N_T;
             
-            // Perform multiplication for current tile
+            // current tile: matrix multiplication
             for (int i = row_start; i < row_end; i++) {
                 for (int j = col_start; j < col_end; j++) {
                     float sum = 0.0f;
@@ -124,7 +128,7 @@ float **matmul_blocking(float **A, float **B, int A_rows, int A_cols, int B_rows
                 }
             }
             
-            // Copy tile_C back to C
+            // copy tile_C back to C
             for (int i = 0; i < M_T; i++) {
                 for (int j = 0; j < N_T; j++) {
                     C[row_start + i][col_start + j] = tile_C[i * N_T + j];
@@ -133,11 +137,11 @@ float **matmul_blocking(float **A, float **B, int A_rows, int A_cols, int B_rows
         }
     }
 
-    // Handle row remainder if it exists
+    // handle row remainder if exists
     if (row_remainder > 0) {
         int row_start = A_rows - row_remainder;
         
-        // Allocate tile for row remainder
+
         float *tile_row = (float *)malloc(row_remainder * N_T * sizeof(float));
         
         for (int nn = 0; nn < B_cols / N_T; nn++) {
@@ -146,7 +150,7 @@ float **matmul_blocking(float **A, float **B, int A_rows, int A_cols, int B_rows
             int col_start = nn * N_T;
             int col_end = (nn + 1) * N_T;
             
-            // Compute remainder rows
+            // compute remainder rows - matrix multiplication
             for (int i = row_start; i < A_rows; i++) {
                 for (int j = col_start; j < col_end; j++) {
                     float sum = 0.0f;
@@ -157,7 +161,7 @@ float **matmul_blocking(float **A, float **B, int A_rows, int A_cols, int B_rows
                 }
             }
             
-            // Copy results back
+            // copy results back
             for (int i = 0; i < row_remainder; i++) {
                 for (int j = 0; j < N_T; j++) {
                     C[row_start + i][col_start + j] = tile_row[i * N_T + j];
@@ -168,11 +172,11 @@ float **matmul_blocking(float **A, float **B, int A_rows, int A_cols, int B_rows
         free(tile_row);
     }
 
-    // Handle column remainder if it exists
+    // handle column remainder if it exists
     if (col_remainder > 0) {
         int col_start = B_cols - col_remainder;
         
-        // Allocate tile for column remainder
+
         float *tile_col = (float *)malloc(M_T * col_remainder * sizeof(float));
         
         for (int mm = 0; mm < A_rows / M_T; mm++) {
@@ -181,7 +185,7 @@ float **matmul_blocking(float **A, float **B, int A_rows, int A_cols, int B_rows
             int row_start = mm * M_T;
             int row_end = (mm + 1) * M_T;
             
-            // Compute remainder columns
+            // matmul for remainder columns
             for (int i = row_start; i < row_end; i++) {
                 for (int j = col_start; j < B_cols; j++) {
                     float sum = 0.0f;
@@ -192,7 +196,7 @@ float **matmul_blocking(float **A, float **B, int A_rows, int A_cols, int B_rows
                 }
             }
             
-            // Copy results back
+            // copy results back
             for (int i = 0; i < M_T; i++) {
                 for (int j = 0; j < col_remainder; j++) {
                     C[row_start + i][col_start + j] = tile_col[i * col_remainder + j];
@@ -203,12 +207,12 @@ float **matmul_blocking(float **A, float **B, int A_rows, int A_cols, int B_rows
         free(tile_col);
     }
 
-    // Handle corner case (if both remainders exist)
+    //corner case (if both remainders exist)
     if (row_remainder > 0 && col_remainder > 0) {
         int row_start = A_rows - row_remainder;
         int col_start = B_cols - col_remainder;
         
-        // Compute corner directly
+        // compute directly
         for (int i = row_start; i < A_rows; i++) {
             for (int j = col_start; j < B_cols; j++) {
                 float sum = 0.0f;
