@@ -6,6 +6,5 @@
 #include "linear.h"
 #include "functional.h"
 #include "nn.h"
-#include "attention.h"
 
 #endif // KERNEL_H

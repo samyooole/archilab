@@ -1,17 +1,5 @@
 #include "matrix_ops.h"
-#include "string.h"
 
-#ifndef BLOCK_SIZE_I
-#define BLOCK_SIZE_I 169
-#endif
-
-#ifndef BLOCK_SIZE_J
-#define BLOCK_SIZE_J 32
-#endif
-
-#ifndef BLOCK_SIZE_K
-#define BLOCK_SIZE_K 9
-#endif
 
 float **matmul(float **A, float **B, int A_rows, int A_cols, int B_rows, int B_cols) 
 {
@@ -51,181 +39,122 @@ void free_matrix(float **matrix, int rows) {
 */
 
 
-
-// Matmul with blocking optimization
-float **matmul_blocking(float **A, float **B, int A_rows, int A_cols, int B_rows, int B_cols)
+float **matmul_sparse(float **A, float **B, int A_rows, int A_cols, int B_rows, int B_cols)
 {
-    // TODO: Implement matrix multiplication with blocking (loop tiling)
+    // Step 1: Create CSR representations of the input matrices
+    float **A_CSR = csr_alloc(A, A_rows, A_cols); 
+    float **B_CSR = csr_alloc(B, B_rows, B_cols);
 
-    // reference: http://alvinwan.com/how-to-tile-matrix-multiplication/
+    // alloc output matrix C's memory
+    float **C = (float **)malloc(A_rows * sizeof(float *));
+    for (int i = 0; i < A_rows; i++) {
+        C[i] = (float *)calloc(B_cols, sizeof(float));  // Initialize to 0
+    }
+
+    // Step 2: Perform sparse matrix multiplication
+    for (int i = 0; i < A_rows; i++) {
+        int row_start = A_CSR[1][i];
+        int row_end = A_CSR[1][i + 1];
+
+        for (int j = row_start; j < row_end; j++) {
+            float A_value = A_CSR[0][j];
+            int A_col = A_CSR[2][j];
+
+            // multiply with the non-zero elements in the B matrix row corresponding to A_col
+            int B_row_start = B_CSR[1][A_col];
+            int B_row_end = B_CSR[1][A_col + 1];
+
+            for (int k = B_row_start; k < B_row_end; k++) {
+                float B_value = B_CSR[0][k];
+                int B_col = B_CSR[2][k];
+
+                // accumulate the product in the C matrix
+                C[i][B_col] += A_value * B_value;
+            }
+        }
+    }
+
+    // free csr matrices
+    free(A_CSR[0]); free(A_CSR[1]); free(A_CSR[2]); free(A_CSR);
+    free(B_CSR[0]); free(B_CSR[1]); free(B_CSR[2]); free(B_CSR);
+
+    return C;
+}
 
 
-    /*
-    We are given two matrices, A, and B
+float **csr_alloc(float **A, int A_rows, int A_cols)
+{
+    // allocate memory gradually - we first begin with extracting all the non-zero values
 
-    A: m * k (A_rows * A_cols)
-    B: k * n (B_rows * B_cols)
+    // take the dynamic array approach
+    int initial_size = 10;
+    int current_size = initial_size;
+    int nonzerovalue_count = 0;
 
-    Which produce an output matrix
+    // allocate initial memory
 
-    C: m * n (A_rows * B_cols)
+    float **CSR_array = (float **)malloc(3 * sizeof(float *)); // we have 3 rows
+    if (!CSR_array) return NULL; // graceful exception handling
 
-    Tiling means determining some
 
-    m_t < m
-    n_t < n
+    CSR_array[0] = (float *)malloc(current_size * sizeof(float));
+    CSR_array[2] = (float *)malloc(current_size * sizeof(float));
+    CSR_array[1] = (float *)malloc( (A_rows + 1) * sizeof(float));
 
-    Such that we use A(m_t * k) x B(k * n_t) in order to produce the output submatrix C(m_t * n_t)
-
-    With the goal of minimizing fetches
-    
-    */
-
-   if (A_cols != B_rows) {
-        fprintf(stderr, "Matrix dimensions not compatible for matmul\n");
+    // graceful exception handling
+    if (!CSR_array[0] || !CSR_array[1] || !CSR_array[2]) {
+        free(CSR_array[0]);
+        free(CSR_array[1]);
+        free(CSR_array[2]);
+        free(CSR_array);
         return NULL;
     }
 
-    // allocate output matrix C
-    float **C = (float **)malloc(A_rows * sizeof(float *));
-    for (int i = 0; i < A_rows; i++) {
-        C[i] = (float *)malloc(B_cols * sizeof(float));  // init to 0
-    }
+    for (int a_row = 0; a_row < A_rows; a_row++) {
 
+        // after each row is done, get cumulative # of non-zero values and put in CSR_array[1]
+        CSR_array[1][a_row] = nonzerovalue_count;
+        for (int a_col = 0; a_col < A_cols; a_col++) {
+            if (A[a_row][a_col] != 0) {
+                // if the current count exceeds the allocated size, reallocate with more space
+                if (nonzerovalue_count >= current_size) {
+                    current_size *= 2; // Double the size
+                    
 
-    int M_T = 64;
-    int N_T = 64;
-    int K = A_cols;
-
-
-    // handle the case where dimensions are odd
-    int row_remainder = A_rows % M_T;
-    int col_remainder = B_cols % N_T;
-
-    // allocate local tiles
-    float *tile_C = (float *)malloc(M_T * N_T * sizeof(float));
-
-    // loop over the integer number of tiles (main case: for the max integer # of tiles that can fit under the current  size)
-    for (int mm = 0; mm < A_rows / M_T; mm++) {
-        for (int nn = 0; nn < B_cols / N_T; nn++) {
-
-            memset(tile_C, 0, M_T * N_T * sizeof(float));
-            
-            // calculate tile boundaries
-            int row_start = mm * M_T;
-            int row_end = (mm + 1) * M_T;
-            int col_start = nn * N_T;
-            int col_end = (nn + 1) * N_T;
-            
-            // current tile: matrix multiplication
-            for (int i = row_start; i < row_end; i++) {
-                for (int j = col_start; j < col_end; j++) {
-                    float sum = 0.0f;
-                    for (int k = 0; k < K; k++) {
-                        sum += A[i][k] * B[k][j];
+                    float *new_values = (float *)realloc(CSR_array[0], current_size * sizeof(float));
+                    float *new_columns = (float *)realloc(CSR_array[2], current_size * sizeof(float));
+                    
+                    if (!new_values || !new_columns) {
+                        free(CSR_array[0]);
+                        free(CSR_array[1]);
+                        free(CSR_array[2]);
+                        free(CSR_array);
+                        return NULL;
                     }
-                    tile_C[(i - row_start) * N_T + (j - col_start)] = sum;
-                }
-            }
-            
-            // copy tile_C back to C
-            for (int i = 0; i < M_T; i++) {
-                for (int j = 0; j < N_T; j++) {
-                    C[row_start + i][col_start + j] = tile_C[i * N_T + j];
-                }
-            }
-        }
-    }
+                    CSR_array[0] = new_values;
+                    CSR_array[2] = new_columns;
 
-    // handle row remainder if exists
-    if (row_remainder > 0) {
-        int row_start = A_rows - row_remainder;
-        
-
-        float *tile_row = (float *)malloc(row_remainder * N_T * sizeof(float));
-        
-        for (int nn = 0; nn < B_cols / N_T; nn++) {
-            memset(tile_row, 0, row_remainder * N_T * sizeof(float));
-            
-            int col_start = nn * N_T;
-            int col_end = (nn + 1) * N_T;
-            
-            // compute remainder rows - matrix multiplication
-            for (int i = row_start; i < A_rows; i++) {
-                for (int j = col_start; j < col_end; j++) {
-                    float sum = 0.0f;
-                    for (int k = 0; k < K; k++) {
-                        sum += A[i][k] * B[k][j];
-                    }
-                    tile_row[(i - row_start) * N_T + (j - col_start)] = sum;
                 }
-            }
-            
-            // copy results back
-            for (int i = 0; i < row_remainder; i++) {
-                for (int j = 0; j < N_T; j++) {
-                    C[row_start + i][col_start + j] = tile_row[i * N_T + j];
-                }
+                // append non-zero element to array_one
+                
+                CSR_array[0][nonzerovalue_count] = A[a_row][a_col];
+                CSR_array[2][nonzerovalue_count] = a_col;
+                nonzerovalue_count++;
             }
         }
-        
-        free(tile_row);
+
+        CSR_array[1][a_row+1] = nonzerovalue_count; // final entry for the row pointer array
+
+
     }
 
-    // handle column remainder if it exists
-    if (col_remainder > 0) {
-        int col_start = B_cols - col_remainder;
-        
+    // trim array to the exact size needed - necessary?
+    /*
+    CSR_array[0] = (float *)realloc(CSR_array[0], nonzerovalue_count * sizeof(float));
+    CSR_array[1] = (float *)realloc(CSR_array[1], nonzerovalue_count * sizeof(float));
+    CSR_array[2] = (float *)realloc(CSR_array[0], nonzerovalue_count * sizeof(float));
+    */
+    
 
-        float *tile_col = (float *)malloc(M_T * col_remainder * sizeof(float));
-        
-        for (int mm = 0; mm < A_rows / M_T; mm++) {
-            memset(tile_col, 0, M_T * col_remainder * sizeof(float));
-            
-            int row_start = mm * M_T;
-            int row_end = (mm + 1) * M_T;
-            
-            // matmul for remainder columns
-            for (int i = row_start; i < row_end; i++) {
-                for (int j = col_start; j < B_cols; j++) {
-                    float sum = 0.0f;
-                    for (int k = 0; k < K; k++) {
-                        sum += A[i][k] * B[k][j];
-                    }
-                    tile_col[(i - row_start) * col_remainder + (j - col_start)] = sum;
-                }
-            }
-            
-            // copy results back
-            for (int i = 0; i < M_T; i++) {
-                for (int j = 0; j < col_remainder; j++) {
-                    C[row_start + i][col_start + j] = tile_col[i * col_remainder + j];
-                }
-            }
-        }
-        
-        free(tile_col);
-    }
-
-    //corner case (if both remainders exist)
-    if (row_remainder > 0 && col_remainder > 0) {
-        int row_start = A_rows - row_remainder;
-        int col_start = B_cols - col_remainder;
-        
-        // compute directly
-        for (int i = row_start; i < A_rows; i++) {
-            for (int j = col_start; j < B_cols; j++) {
-                float sum = 0.0f;
-                for (int k = 0; k < K; k++) {
-                    sum += A[i][k] * B[k][j];
-                }
-                C[i][j] = sum;
-            }
-        }
-    }
-
-    free(tile_C);
-    return C;
-
-
+    return CSR_array;
 }

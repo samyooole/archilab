@@ -1,1 +1,1 @@
-# Assignment 2: Optimize the performance of the ML operations using tiling and blocking
+# Assignment 3: Optimize the performance of the ML operations implemented using sparsity

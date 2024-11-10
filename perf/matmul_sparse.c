@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include "matrix_ops.h"
+#include "kernel/matrix_ops.h"
 
 float **generate_random_matrix(int rows, int cols) {
     float **matrix = (float **)malloc(rows * sizeof(float *));
@@ -14,8 +14,6 @@ float **generate_random_matrix(int rows, int cols) {
     return matrix;
 }
 
-
-
 void free_matrix(float **matrix, int rows) {
     for (int i = 0; i < rows; i++) {
         free(matrix[i]);
@@ -23,11 +21,9 @@ void free_matrix(float **matrix, int rows) {
     free(matrix);
 }
 
-
-
 int main() {
     srand(time(NULL));
-    int A_rows = 1024, A_cols = 1024, B_rows = 1024, B_cols = 1024;
+    int A_rows = 1300, A_cols = 1300, B_rows = 1300, B_cols = 1300;
 
     if (A_cols != B_rows) {
         printf("Matrix dimensions incompatible for multiplication.\n");
@@ -36,22 +32,16 @@ int main() {
 
     float **A = generate_random_matrix(A_rows, A_cols);
     float **B = generate_random_matrix(B_rows, B_cols);
-    float **C = NULL;
 
-    printf("Performing blocking multiplication...\n");
-
-    for (int i = 0; i < 10; i++){
-        float **C = matmul_blocking(A, B, A_rows, A_cols, B_rows, B_cols);
-        free_matrix(C, A_rows);
-    }
-    
+    printf("Performing matmul_sparse...\n");
+    float **C = matmul_sparse(A, B, A_rows, A_cols, B_rows, B_cols);
 
     // Cleanup
     free_matrix(A, A_rows);
     free_matrix(B, B_rows);
     free_matrix(C, A_rows);
 
-    printf("Blocking multiplications completed.\n");
+    printf("matmul_sparse completed.\n");
 
     return 0;
 }
