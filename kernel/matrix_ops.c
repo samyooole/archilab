@@ -41,6 +41,13 @@ void free_matrix(float **matrix, int rows) {
 
 float **matmul_sparse(float **A, float **B, int A_rows, int A_cols, int B_rows, int B_cols)
 {
+    // check if matrix dims compatible with matmul
+    if (A_cols != B_rows) {
+        fprintf(stderr, "Matrix dimensions not compatible for matmul\n");
+        return NULL;
+    }
+
+
     // Step 1: Create CSR representations of the input matrices
     float **A_CSR = csr_alloc(A, A_rows, A_cols); 
     float **B_CSR = csr_alloc(B, B_rows, B_cols);

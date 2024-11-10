@@ -50,7 +50,7 @@ void test_matmul_square_matrices(void)
     expected[1][1] = 8.0f;
 
     // Run function under test
-    float **C = matmul(A, B, 2, 2, 2, 2);
+    float **C = matmul_sparse(A, B, 2, 2, 2, 2);
 
     // Check expectations
     assert_float_array_equal_matmul(expected, C, 2, 2);
@@ -85,7 +85,7 @@ void test_matmul_incompatible_dimensions(void)
     }
 
     // Run function under test
-    float **C = matmul(A, B, 2, 3, 2, 2);
+    float **C = matmul_sparse(A, B, 2, 3, 2, 2);
 
     // Check expectations
     UNITY_TEST_ASSERT_NULL(C, __LINE__, "Expected NULL!");
