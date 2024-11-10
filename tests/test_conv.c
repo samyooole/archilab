@@ -112,7 +112,7 @@ void test_conv(void)
     }
 
     // Run function under test
-    float ***convOutput = convolution(image, numChannels, kernel, biasData, 1, 5, 3);
+    float ***convOutput = convolution_im2col(image, numChannels, kernel, biasData, 1, 5, 3, MATMUL_BASE);
 
     // Check expectations
     assert_float_array_equal_conv(expected, convOutput, 1, 3, 3);
@@ -131,3 +131,156 @@ void test_conv(void)
     free_convOutput(convOutput, numFilters, kernelSize);
 }
 
+void test_conv_all_zeros(void)
+{
+    // Setup
+    float image_data[1][5][5] = {
+        {
+            {0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0}
+        }
+    };
+    int numChannels = 1;
+    float ***image = init_image(image_data, 5, numChannels);
+
+    float kernel_data[1][1][3][3] = {
+        {
+            {
+                {1, 0, 1},
+                {2, 0, 2},
+                {1, 0, 1}
+            }
+        }
+    };
+    int numFilters = 1;
+    int kernelSize = 3;
+    float ****kernel = init_kernel(kernel_data, numFilters, kernelSize);
+
+    // Initialize the bias
+    float *biasData = (float *)malloc(1 * sizeof(float));
+    biasData[0] = 0;
+
+    float ***expected = (float ***)malloc(1 * sizeof(float **));
+    for(int i = 0; i < 1; i++) {
+        expected[i] = (float **)malloc(3 * sizeof(float *));
+        for(int j = 0; j < 3; j++) {
+            expected[i][j] = (float *)malloc(3 * sizeof(float));
+        }
+    }
+    
+    // Initialize the expected result
+    float expected_values[1][3][3] = {
+        {
+            {0, 0, 0},
+            {0, 0, 0},
+            {0, 0, 0}
+        }
+    };
+    for (int i = 0; i < 1; i++) {
+        for (int j = 0; j < 3; j++) {
+            for (int k = 0; k < 3; k++) {
+                expected[i][j][k] = expected_values[i][j][k];
+            }
+        }
+    }
+
+    // Run function under test
+    float ***convOutput = convolution_im2col(image, numChannels, kernel, biasData, 1, 5, 3, MATMUL_BASE);
+
+    // Check expectations
+    assert_float_array_equal_conv(expected, convOutput, 1, 3, 3);
+
+    // Cleanup
+    free_image(image, numChannels, 5);
+    free_kernel(kernel, 1, 3);
+    free(biasData);
+    for(int i = 0; i < 1; i++) {
+        for(int j = 0; j < 3; j++) {
+            free(expected[i][j]);
+        }
+        free(expected[i]);
+    }
+    free(expected);
+    free_convOutput(convOutput, numFilters, kernelSize);
+}
+
+
+void test_conv_single_pixel(void)
+{
+    // Setup
+    float image_data[1][5][5] = {
+        {
+            {0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0},
+            {0, 0, 1, 0, 0},
+            {0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0}
+        }
+    };
+    int numChannels = 1;
+    float ***image = init_image(image_data, 5, numChannels);
+
+    float kernel_data[1][1][3][3] = {
+        {
+            {
+                {1, 0, 1},
+                {2, 0, 2},
+                {1, 0, 1}
+            }
+        }
+    };
+    int numFilters = 1;
+    int kernelSize = 3;
+    float ****kernel = init_kernel(kernel_data, numFilters, kernelSize);
+
+    // Initialize the bias
+    float *biasData = (float *)malloc(1 * sizeof(float));
+    biasData[0] = 0;
+
+    float ***expected = (float ***)malloc(1 * sizeof(float **));
+    for(int i = 0; i < 1; i++) {
+        expected[i] = (float **)malloc(3 * sizeof(float *));
+        for(int j = 0; j < 3; j++) {
+            expected[i][j] = (float *)malloc(3 * sizeof(float));
+        }
+    }
+    
+
+    // Initialize the expected result
+    float expected_values[1][3][3] = {
+        {
+            {1, 0, 1},
+            {2, 0, 2},
+            {1, 0, 1}
+        }
+    };
+    for (int i = 0; i < 1; i++) {
+        for (int j = 0; j < 3; j++) {
+            for (int k = 0; k < 3; k++) {
+                expected[i][j][k] = expected_values[i][j][k];
+            }
+        }
+    }
+
+    // Run function under test
+    float ***convOutput = convolution_im2col(image, numChannels, kernel, biasData, 1, 5, 3, MATMUL_BASE);
+
+    // Check expectations
+    assert_float_array_equal_conv(expected, convOutput, 1, 3, 3);
+
+    // Cleanup
+    free_image(image, numChannels, 5);
+    free_kernel(kernel, 1, 3);
+    free(biasData);
+    for(int i = 0; i < 1; i++) {
+        for(int j = 0; j < 3; j++) {
+            free(expected[i][j]);
+        }
+        free(expected[i]);
+    }
+    free(expected);
+    free_convOutput(convOutput, numFilters, kernelSize);
+}

@@ -18,6 +18,9 @@ int main(void) {
 
     // Test conv
     RUN_TEST(test_conv);
+    RUN_TEST(test_conv_all_zeros);
+    RUN_TEST(test_conv_single_pixel);
+
 
     // Test nn
     /*
