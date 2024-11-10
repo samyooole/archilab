@@ -48,6 +48,7 @@ int main(void) {
 
     // Test matrix_ops
     RUN_TEST(test_matmul_square_matrices);
+    RUN_TEST(test_matmul_rectangular_matrices);
     RUN_TEST(test_matmul_incompatible_dimensions);
 
     return UNITY_END();
