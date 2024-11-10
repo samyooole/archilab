@@ -4,12 +4,64 @@
 float **im2col(float ***image, int numChannels, int imageSize, int kernelSize, int stride, int *outputSize)
 {
     // TODO: Implement the im2col algorithm
+
+    // calculate output dimensions
+    int outputDim = (imageSize - kernelSize) / stride + 1;
+    int patchSize = numChannels * kernelSize * kernelSize;  // rows in output matrix
+    *outputSize = outputDim * outputDim;  // columns in output matrix
+    
+    // allocate memory for the output matrix
+    float **cols = (float **)malloc(patchSize * sizeof(float *));
+    for (int i = 0; i < patchSize; i++) {
+        cols[i] = (float *)malloc((*outputSize) * sizeof(float));
+    }
+    
+    int col_idx = 0;
+    // for each possible patch position
+    for (int i = 0; i <= imageSize - kernelSize; i += stride) {
+        for (int j = 0; j <= imageSize - kernelSize; j += stride) {
+            // for each channel
+            int row_idx = 0;
+            for (int c = 0; c < numChannels; c++) {
+                // for each element in the patch
+                for (int ki = 0; ki < kernelSize; ki++) {
+                    for (int kj = 0; kj < kernelSize; kj++) {
+                        cols[row_idx][col_idx] = image[c][i + ki][j + kj];
+                        row_idx++;
+                    }
+                }
+            }
+            col_idx++;
+        }
+    }
+    
+    return cols;
 }
 
 // Im2col algorithm's inverse
 float ***col2im(float **result, int num_kernels, int conv_rows, int conv_cols)
 {
     // TODO: Implement the col2im algorithm
+
+    // allocate memory for the output image
+    float ***output = (float ***)malloc(num_kernels * sizeof(float **));
+    for (int i = 0; i < num_kernels; i++) {
+        output[i] = (float **)malloc(conv_rows * sizeof(float *));
+        for (int j = 0; j < conv_rows; j++) {
+            output[i][j] = (float *)malloc(conv_cols * sizeof(float));
+        }
+    }
+    
+    // copy data from columns back to image format
+    for (int k = 0; k < num_kernels; k++) {
+        for (int i = 0; i < conv_rows; i++) {
+            for (int j = 0; j < conv_cols; j++) {
+                output[k][i][j] = result[k][i * conv_cols + j];
+            }
+        }
+    }
+    
+    return output;
 }
 
 float **kernel_flatten(float ****kernel, int num_kernels, int kernel_size)
@@ -102,18 +154,54 @@ float ***convolution(float ***image, int numChannels, float ****kernel, float *b
 }
 
 // Convolution with im2col algorithm
-float ***convolution_im2col(float ***image, int numChannels, float ****kernel, float *biasData, int numFilters, int inputSize, int kernelSize, MatmulType matmul_type)
-{
-    // TODO: Implement the convolution operation with im2col algorithm
-    // Flatten kernel
+float ***convolution_im2col(float ***image, int numChannels, float ****kernel, float *biasData, int numFilters, int inputSize, int kernelSize, MatmulType matmul_type) {
+    int outputSize;
+    
+    // 1. apply im2col to the input image
+    float **image_cols = im2col(image, numChannels, inputSize, kernelSize, 1, &outputSize);
+    
+    // 2. flatten kernels
+    float **flat_kernels = kernel_flatten(kernel, numFilters, kernelSize);
+    
+    // 3. perform matrix multiplication
+    int conv_size = inputSize - kernelSize + 1;
 
-    // Apply im2col
-
-    // Apply matmul
-
-    // Apply col2im
-
-    // Add bias and apply ReLU
-
-    // Cleanup
+    float **result;
+    
+    switch (matmul_type) {
+        case MATMUL_BASE:
+            // basic matrix mult
+            result = matmul(flat_kernels, numFilters, kernelSize * kernelSize * numChannels, image_cols, kernelSize * kernelSize * numChannels, outputSize);
+            break;
+            
+        case MATMUL_SPARSE:
+            // sparse matrix mult
+            result = matmul_sparse(flat_kernels, numFilters, kernelSize * kernelSize * numChannels, image_cols, kernelSize * kernelSize * numChannels, outputSize);
+            break;
+    }
+    
+    // 4. add bias, apply relu
+    for (int i = 0; i < numFilters; i++) {
+        for (int j = 0; j < outputSize; j++) {
+            result[i][j] = relu(result[i][j] + biasData[i]);
+        }
+    }
+    
+    // 5. reshape back to image format using col2im
+    float ***output = col2im(result, numFilters, conv_size, conv_size);
+    
+    // cleanup
+    for (int i = 0; i < numChannels * kernelSize * kernelSize; i++) {
+        free(image_cols[i]);
+    }
+    free(image_cols);
+    
+    for (int i = 0; i < numFilters; i++) {
+        free(flat_kernels[i]);
+        free(result[i]);
+    }
+    free(flat_kernels);
+    free(result);
+    
+    return output;
 }
