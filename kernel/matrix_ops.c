@@ -165,3 +165,37 @@ float **csr_alloc(float **A, int A_rows, int A_cols)
 
     return CSR_array;
 }
+
+
+float **matmul_sparse_step2(float **A_CSR, float **B_CSR, int A_rows, int A_cols, int B_rows, int B_cols){
+    // alloc output matrix C's memory
+    float **C = (float **)malloc(A_rows * sizeof(float *));
+    for (int i = 0; i < A_rows; i++) {
+        C[i] = (float *)calloc(B_cols, sizeof(float));  // Initialize to 0
+    }
+
+    // Step 2: Perform sparse matrix multiplication
+    for (int i = 0; i < A_rows; i++) {
+        int row_start = A_CSR[1][i];
+        int row_end = A_CSR[1][i + 1];
+
+        for (int j = row_start; j < row_end; j++) {
+            float A_value = A_CSR[0][j];
+            int A_col = A_CSR[2][j];
+
+            // multiply with the non-zero elements in the B matrix row corresponding to A_col
+            int B_row_start = B_CSR[1][A_col];
+            int B_row_end = B_CSR[1][A_col + 1];
+
+            for (int k = B_row_start; k < B_row_end; k++) {
+                float B_value = B_CSR[0][k];
+                int B_col = B_CSR[2][k];
+
+                // accumulate the product in the C matrix
+                C[i][B_col] += A_value * B_value;
+            }
+        }
+    }
+
+    return C;
+}

@@ -1,0 +1,10 @@
+gcc -o matmul_blocking perf/matmul_sparse.c kernel/matrix_ops.c -I kernel/
+/usr/bin/time -f "Real time: %e seconds" ./matmul_sparse
+
+
+srun -p ece5755 -n 1 --mem=1g --pty /bin/bash
+
+python3 /classes/ece5755/pmu-tools/toplev.py --core S0-C0 -l1 -v --no-desc --force-cpu spr ./matmul_blocking
+
+gcc -o matmul_naive perf/matmul_naive.c kernel/matrix_ops.c -I kernel/
+/usr/bin/time -f "Real time: %e seconds" ./matmul_naive
