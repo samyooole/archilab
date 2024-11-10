@@ -64,12 +64,12 @@ float ***col2im(float **result, int num_kernels, int conv_rows, int conv_cols)
     return output;
 }
 
-float **kernel_flatten(float ****kernel, int num_kernels, int kernel_size)
+float **kernel_flatten(float ****kernel, int num_kernels, int kernel_size, int numChannels)
 {
     float **flattened_kernels = (float **)malloc(num_kernels * sizeof(float *));
     for (int i = 0; i < num_kernels; i++)
     {
-        flattened_kernels[i] = (float *)malloc(kernel_size * kernel_size * sizeof(float));
+        flattened_kernels[i] = (float *)malloc(numChannels * kernel_size * kernel_size * sizeof(float));
     }
 
     for (int k = 0; k < num_kernels; k++)
@@ -161,7 +161,7 @@ float ***convolution_im2col(float ***image, int numChannels, float ****kernel, f
     float **image_cols = im2col(image, numChannels, inputSize, kernelSize, 1, &outputSize);
     
     // 2. flatten kernels
-    float **flat_kernels = kernel_flatten(kernel, numFilters, kernelSize);
+    float **flat_kernels = kernel_flatten(kernel, numFilters, kernelSize, numChannels);
     
     // 3. perform matrix multiplication
     int conv_size = inputSize - kernelSize + 1;
@@ -171,12 +171,22 @@ float ***convolution_im2col(float ***image, int numChannels, float ****kernel, f
     switch (matmul_type) {
         case MATMUL_BASE:
             // basic matrix mult
-            result = matmul(flat_kernels, numFilters, kernelSize * kernelSize * numChannels, image_cols, kernelSize * kernelSize * numChannels, outputSize);
+            
+            result = matmul(flat_kernels, image_cols, 
+                numFilters,                           // A_rows
+                kernelSize * kernelSize * numChannels, // A_cols
+                kernelSize * kernelSize * numChannels, // B_rows 
+                outputSize);                          // B_cols
+
             break;
             
         case MATMUL_SPARSE:
             // sparse matrix mult
-            result = matmul_sparse(flat_kernels, numFilters, kernelSize * kernelSize * numChannels, image_cols, kernelSize * kernelSize * numChannels, outputSize);
+            result = matmul_sparse(flat_kernels, image_cols, 
+                numFilters,                           // A_rows
+                kernelSize * kernelSize * numChannels, // A_cols
+                kernelSize * kernelSize * numChannels, // B_rows 
+                outputSize);                          // B_cols
             break;
     }
     
@@ -205,3 +215,4 @@ float ***convolution_im2col(float ***image, int numChannels, float ****kernel, f
     
     return output;
 }
+
