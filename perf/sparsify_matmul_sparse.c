@@ -8,14 +8,18 @@ float **generate_random_matrix(int rows, int cols) {
     for (int i = 0; i < rows; i++) {
         matrix[i] = (float *)malloc(cols * sizeof(float));
         for (int j = 0; j < cols; j++) {
-            matrix[i][j] = (float)rand() / RAND_MAX;
+            // 50% chance to assign 0, otherwise assign a random value between 0 and 1 - KEY DIFFERENCE, WE ARE GENERATING SPARSE MATRICES
+            if (rand() % 2 == 0) {
+                matrix[i][j] = 0.0f;
+            } else {
+                matrix[i][j] = (float)rand() / RAND_MAX;
+            }
         }
     }
     return matrix;
 }
 
 void free_matrix(float **matrix, int rows) {
-    if (matrix == NULL) return;  // Add NULL check
     for (int i = 0; i < rows; i++) {
         free(matrix[i]);
     }
@@ -35,22 +39,38 @@ int main() {
     float **B = generate_random_matrix(B_rows, B_cols);
     float **C = NULL;
     
-    printf("Performing naive multiplication...\n");
 
+    float **A_CSR = csr_alloc(A, A_rows, A_cols);
+    float **B_CSR = csr_alloc(B, B_rows, B_cols);
     
+    printf("Performing sparse multiplication...\n");
     for (int i = 0; i < 10000; i++) {
-        C = matmul(A, B, A_rows, A_cols, B_rows, B_cols);
-        if (C != NULL) {  // Add error checking
+        C = matmul_sparse_step2(A_CSR, B_CSR, A_rows, A_cols, B_rows, B_cols);
+        if (C != NULL) {  
             free_matrix(C, A_rows);
         }
-        C = NULL;  // Set to NULL after freeing
+        C = NULL;  
     }
     
     // Cleanup
     free_matrix(A, A_rows);
     free_matrix(B, B_rows);
-    // Remove the extra free_matrix(C, A_rows) since C is already freed in the loop
     
-    printf("Naive multiplications completed.\n");
+    // Free CSR matrices if you're using them
+    if (A_CSR != NULL) {
+        free(A_CSR[0]); 
+        free(A_CSR[1]); 
+        free(A_CSR[2]); 
+        free(A_CSR);
+    }
+    
+    if (B_CSR != NULL) {
+        free(B_CSR[0]); 
+        free(B_CSR[1]); 
+        free(B_CSR[2]); 
+        free(B_CSR);
+    }
+    
+    printf("Sparse multiplications completed.\n");
     return 0;
 }
