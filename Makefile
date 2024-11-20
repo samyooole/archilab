@@ -10,23 +10,17 @@ UNITY_FILES = ./tests/unity/unity.c
 TEST_FILES = $(wildcard ./tests/*.c)
 TEST_EXECUTABLES = $(patsubst %.c,%,$(TEST_FILES))
 
-# Grading
-UNITY_FILES = ./grading/unity/unity.c
-GRADING_FILES = $(wildcard ./grading/*.c)
-GRADING_EXECUTABLES = $(patsubst %.c,%,$(GRADING_FILES)) grading/grading_tests
-GRADING_TESTS_OUTPUT = grading.txt
-
 # Performance
 MATMUL_TARGETS = matmul_naive matmul_thread
 
-BINS = lab4
+BINS = lab3
 
 .PHONY: all
 all: $(BINS)
 
-.PHONY: lab4
-lab4: lab4.c $(COMMON_HDRS)
-	$(CC) -o $@ lab4.c $(COMMON_SRC) $(CFLAGS) $(HDF5_FLAGS)
+.PHONY: lab3
+lab3: lab3.c $(COMMON_HDRS)
+	$(CC) -o $@ lab3.c $(COMMON_SRC) $(CFLAGS) $(HDF5_FLAGS)
 
 .PHONY: test
 test: all_tests

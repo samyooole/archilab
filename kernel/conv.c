@@ -179,7 +179,8 @@ float ***convolution_im2col(float ***image, int numChannels, float ****kernel, f
                 outputSize);                          // B_cols
 
             break;
-            
+
+        /* uncomment to get matmul sparse from this particular function
         case MATMUL_SPARSE:
             // sparse matrix mult
             result = matmul_sparse(flat_kernels, image_cols, 
@@ -188,6 +189,8 @@ float ***convolution_im2col(float ***image, int numChannels, float ****kernel, f
                 kernelSize * kernelSize * numChannels, // B_rows 
                 outputSize);                          // B_cols
             break;
+        */ 
+        
     }
     
     // 4. add bias, apply relu
