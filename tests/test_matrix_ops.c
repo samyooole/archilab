@@ -50,7 +50,7 @@ void test_matmul_square_matrices(void)
     expected[1][1] = 8.0f;
 
     // Run function under test
-    float **C = matmul_sparse(A, B, 2, 2, 2, 2);
+    float **C = matmul(A, B, 2, 2, 2, 2);
 
     // Check expectations
     assert_float_array_equal_matmul(expected, C, 2, 2);
@@ -67,6 +67,37 @@ void test_matmul_square_matrices(void)
     free(B);
     free(C);
     free(expected);
+}
+
+void test_matmul_incompatible_dimensions(void)
+{
+    // Setup
+    float **A = (float **)malloc(2 * sizeof(float *));
+    for (int i = 0; i < 2; i++)
+    {
+        A[i] = (float *)malloc(3 * sizeof(float));
+    }
+
+    float **B = (float **)malloc(2 * sizeof(float *));
+    for (int i = 0; i < 2; i++)
+    {
+        B[i] = (float *)malloc(2 * sizeof(float));
+    }
+
+    // Run function under test
+    float **C = matmul(A, B, 2, 3, 2, 2);
+
+    // Check expectations
+    UNITY_TEST_ASSERT_NULL(C, __LINE__, "Expected NULL!");
+
+    // Cleanup
+    for (int i = 0; i < 2; i++)
+    {
+        free(A[i]);
+        free(B[i]);
+    }
+    free(A);
+    free(B);
 }
 
 void test_matmul_rectangular_matrices(void)
@@ -141,37 +172,4 @@ void test_matmul_rectangular_matrices(void)
     free(B);
     free(C);
     free(expected);
-}
-
-
-void test_matmul_incompatible_dimensions(void)
-{
-    // we passed this previously because we already checked for incompatible dimensions
-    // Setup
-    float **A = (float **)malloc(2 * sizeof(float *));
-    for (int i = 0; i < 2; i++)
-    {
-        A[i] = (float *)malloc(3 * sizeof(float));
-    }
-
-    float **B = (float **)malloc(2 * sizeof(float *));
-    for (int i = 0; i < 2; i++)
-    {
-        B[i] = (float *)malloc(2 * sizeof(float));
-    }
-
-    // Run function under test
-    float **C = matmul_sparse(A, B, 2, 3, 2, 2);
-
-    // Check expectations
-    UNITY_TEST_ASSERT_NULL(C, __LINE__, "Expected NULL!");
-
-    // Cleanup
-    for (int i = 0; i < 2; i++)
-    {
-        free(A[i]);
-        free(B[i]);
-    }
-    free(A);
-    free(B);
 }

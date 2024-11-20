@@ -215,4 +215,3 @@ float ***convolution_im2col(float ***image, int numChannels, float ****kernel, f
     
     return output;
 }
-

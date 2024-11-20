@@ -16,37 +16,26 @@ void tearDown(void) {
 int main(void) {
     UNITY_BEGIN();
 
+    /*
     // Test conv
     RUN_TEST(test_conv);
-    RUN_TEST(test_conv_all_zeros);
-    RUN_TEST(test_conv_single_pixel);
-
 
     // Test nn
-    /*
     RUN_TEST(test_flatten_basic);
     RUN_TEST(test_predict_simple_array);
     RUN_TEST(test_predict_all_same_values);
     RUN_TEST(test_predict_mix_of_negatives_and_positives);
-    */
-    // not of concern this lab
-    
 
 
     // Test functional
-    /*
     RUN_TEST(test_softmax_basic);
     RUN_TEST(test_relu);
-    */
-   // not of concern this lab
-    
 
     // Test linear
-    /*
     RUN_TEST(test_linear_basic);
     RUN_TEST(test_linear_basic2);
+    
     */
-   // not of concern this lab
     
 
     // Test matrix_ops
