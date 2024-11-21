@@ -38,7 +38,7 @@ int main() {
     printf("Performing naive multiplication...\n");
 
     
-    for (int i = 0; i < 10000; i++) {
+    for (int i = 0; i < 100; i++) {
         C = matmul(A, B, A_rows, A_cols, B_rows, B_cols);
         if (C != NULL) {  // Add error checking
             free_matrix(C, A_rows);

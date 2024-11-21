@@ -1,28 +1,16 @@
-gcc -o matmul_sparse perf/matmul_sparse.c kernel/matrix_ops.c -I kernel/
-/usr/bin/time -f "Real time: %e seconds" ./matmul_sparse
+# -lpthread to compile for multi threading
 
-
-gcc -o sparsify_matmul_sparse perf/sparsify_matmul_sparse.c kernel/matrix_ops.c -I kernel/
-/usr/bin/time -f "Real time: %e seconds" ./sparsify_matmul_sparse
-
-
-srun -p ece5755 -n 1 --mem=1g --pty /bin/bash
-
-gcc -o matmul_sparse perf/matmul_sparse.c kernel/matrix_ops.c -I kernel/
-python3 /classes/ece5755/pmu-tools/toplev.py --core S0-C0 -l1 -v --no-desc --force-cpu spr ./matmul_sparse
-
-gcc -o matmul_naive perf/matmul_naive.c kernel/matrix_ops.c -I kernel/
-python3 /classes/ece5755/pmu-tools/toplev.py --core S0-C0 -l1 -v --no-desc --force-cpu spr ./matmul_naive
-
-gcc -o sparsify_matmul_naive perf/sparsify_matmul_naive.c kernel/matrix_ops.c -I kernel/
-python3 /classes/ece5755/pmu-tools/toplev.py --core S0-C0 -l1 -v --no-desc --force-cpu spr ./sparsify_matmul_naive
-
-gcc -o sparsify_matmul_sparse perf/sparsify_matmul_sparse.c kernel/matrix_ops.c -I kernel/
-python3 /classes/ece5755/pmu-tools/toplev.py --core S0-C0 -l1 -v --no-desc --force-cpu spr ./sparsify_matmul_sparse
-
+gcc -o matmul_thread perf/matmul_thread.c kernel/matrix_ops.c -I kernel/ -lpthread
+/usr/bin/time -f "Real time: %e seconds" ./matmul_thread
 
 gcc -o matmul_naive perf/matmul_naive.c kernel/matrix_ops.c -I kernel/
 /usr/bin/time -f "Real time: %e seconds" ./matmul_naive
 
-gcc -o sparsify_matmul_naive perf/sparsify_matmul_naive.c kernel/matrix_ops.c -I kernel/
-/usr/bin/time -f "Real time: %e seconds" ./sparsify_matmul_naive
+
+# multithreading core ops
+srun -p ece5755 -n 1 -c 8 --mem=1g --pty /bin/bash
+taskset -c 0-7 python3 /classes/ece5755/pmu-tools/toplev.py --core S0-C0-C7 -l1 -v --no-desc --force-cpu spr ./matmul_thread
+
+
+
+python3 /classes/ece5755/pmu-tools/toplev.py --core S0-C0 -l1 -v --no-desc --force-cpu spr ./matmul_naive
