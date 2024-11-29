@@ -1,0 +1,21 @@
+
+BASE
+
+gcc -o gpt2 gpt2.c
+
+/usr/bin/time -f "Real time: %e seconds" ./gpt2
+/usr/bin/time ./gpt2
+
+server: 1.18s per it
+apple silicon: 0.663s per it
+
+
+IMPROVED
+
+gcc -o gpt2_opt gpt2_opt.c
+
+/usr/bin/time -f "Real time: %e seconds" ./gpt2
+/usr/bin/time  ./gpt2_opt
+
+server: 0.873s per it
+apple silicon: 0.298s per it
