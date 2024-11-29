@@ -14,3 +14,6 @@ taskset -c 0-7 python3 /classes/ece5755/pmu-tools/toplev.py --core S0-C0-C7 -l1 
 
 
 python3 /classes/ece5755/pmu-tools/toplev.py --core S0-C0 -l1 -v --no-desc --force-cpu spr ./matmul_naive
+
+
+
