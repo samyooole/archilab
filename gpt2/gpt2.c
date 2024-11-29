@@ -62,51 +62,14 @@ float *model(int *tokens, int seqLength, GPT2Weights weights);
 int *positions_for(int *tokens, int seqLength, int past_length);
 
 // Implement the linear layer function
-#include <pthread.h>
-
-typedef struct {
-    float *fcInput;
-    float **weights;
-    float *biases;
-    float *output;
-    int fcInputSize;
-    int start;
-    int end;
-} LinearThreadData;
-
-void *linear_thread(void *arg) {
-    LinearThreadData *data = (LinearThreadData *)arg;
-    for (int i = data->start; i < data->end; i++) {
-        data->output[i] = data->biases[i];
-        for (int j = 0; j < data->fcInputSize; j++) {
-            data->output[i] += data->fcInput[j] * data->weights[i][j];
-        }
-    }
-    return NULL;
-}
-
 float *linear(float *fcInput, float **weights, float *biases, int fcInputSize, int fcOutputSize) {
     float *output = (float *)malloc(fcOutputSize * sizeof(float));
-    int num_threads = 8; // Number of threads to use
-    pthread_t threads[num_threads];
-    LinearThreadData thread_data[num_threads];
-
-    int chunk_size = fcOutputSize / num_threads;
-    for (int i = 0; i < num_threads; i++) {
-        thread_data[i].fcInput = fcInput;
-        thread_data[i].weights = weights;
-        thread_data[i].biases = biases;
-        thread_data[i].output = output;
-        thread_data[i].fcInputSize = fcInputSize;
-        thread_data[i].start = i * chunk_size;
-        thread_data[i].end = (i == num_threads - 1) ? fcOutputSize : (i + 1) * chunk_size;
-        pthread_create(&threads[i], NULL, linear_thread, &thread_data[i]);
+    for (int i = 0; i < fcOutputSize; i++) {
+        output[i] = biases[i];
+        for (int j = 0; j < fcInputSize; j++) {
+            output[i] += fcInput[j] * weights[i][j];
+        }
     }
-
-    for (int i = 0; i < num_threads; i++) {
-        pthread_join(threads[i], NULL);
-    }
-
     return output;
 }
 
