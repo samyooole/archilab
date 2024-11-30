@@ -12,6 +12,7 @@
 #define VOCAB_SIZE 50257     // GPT-2 vocabulary size
 #define MAX_POSITION_EMBEDDINGS 1024 // Maximum sequence length
 
+
 // Assuming MatmulType is defined elsewhere
 typedef enum { MATMUL_STANDARD, MATMUL_THREADED } MatmulType;
 
@@ -73,6 +74,18 @@ typedef struct {
     int start;
     int end;
 } LinearThreadData;
+
+void *linear_thread_no_asm(void *arg) {
+    LinearThreadData *data = (LinearThreadData *)arg;
+    for (int i = data->start; i < data->end; i++) {
+        data->output[i] = data->biases[i];
+        for (int j = 0; j < data->fcInputSize; j++) {
+            data->output[i] += data->fcInput[j] * data->weights[i][j];
+        }
+    }
+   
+    return NULL;
+}
 
 void *linear_thread(void *arg) {
     LinearThreadData *data = (LinearThreadData *)arg;
@@ -236,7 +249,7 @@ float **norm(float **x, int seqLength, int features) {
 float *gelu(float *x, int size) {
     float *output = (float *)malloc(size * sizeof(float));
     for (int i = 0; i < size; i++) {
-        output[i] = 0.5 * x[i] * (1 + tanh(sqrt(2 / M_PI) * (x[i] + 0.044715 * x[i] * x[i] * x[i])));
+        output[i] = 0.5 * x[i] * (1 + tanh(sqrt(2 / M_PI)) * (x[i] + 0.044715 * x[i] * x[i] * x[i]));
     }
     return output;
 }
@@ -524,7 +537,7 @@ int main() {
     GPT2Weights weights = initialize_weights();
     // Run the model
 
-    for (int i = 1; i < 10; i++) {
+    for (int i = 1; i < 50; i++) {
         float *logits = model(tokens, seqLength, weights);
 
         // Find the token with the highest logit value
