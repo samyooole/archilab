@@ -456,7 +456,7 @@ int main() {
     GPT2Weights weights = initialize_weights();
     // Run the model
 
-    for (int i = 1; i < 50; i++) {
+    for (int i = 1; i < 2; i++) {
         float *logits = model(tokens, seqLength, weights);
 
         // Find the token with the highest logit value

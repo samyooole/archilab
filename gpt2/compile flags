@@ -7,6 +7,8 @@ gcc -o gpt2 gpt2.c -lm
 /usr/bin/time -f "Real time: %e seconds" ./gpt2
 
 
+
+
 apple silicon: 0.663s per it
 
 gcc -o gpt2 gpt2.c
@@ -27,3 +29,23 @@ apple silicon: 0.298s per it
 
 gcc -o gpt2_opt gpt2_opt.c
 /usr/bin/time  ./gpt2_opt
+
+
+
+
+CACHEGRIND
+
+valgrind --tool=cachegrind ./gpt2
+valgrind --tool=cachegrind ./gpt2_opt
+
+
+GPROF
+
+gcc -pg -o gpt2 gpt2.c -lm
+./gpt2
+gprof gpt2 > gprof_nopt.txt
+
+srun -p ece5755 -n 1 -c 8 --mem=1g --pty /bin/bash
+gcc -pg -o gpt2_opt gpt2_opt.c -lm -pthread -msse4.1 -fopenmp -O3
+./gpt2_opt
+gprof gpt2_opt > gprof_opt.txt
