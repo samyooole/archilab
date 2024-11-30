@@ -3,7 +3,6 @@
 #include <math.h>
 #include <string.h>
 #include <time.h>
-#include <immintrin.h>
 
 #define EPSILON 1e-5
 #define EMBEDDING_SIZE 768   // GPT-2 base model embedding size
@@ -77,11 +76,41 @@ typedef struct {
 
 void *linear_thread(void *arg) {
     LinearThreadData *data = (LinearThreadData *)arg;
+    
+    // Use x86-64 SSE assembly for vectorized dot product computation
     for (int i = data->start; i < data->end; i++) {
-        data->output[i] = data->biases[i];
-        for (int j = 0; j < data->fcInputSize; j++) {
-            data->output[i] += data->fcInput[j] * data->weights[i][j];
-        }
+        __asm__ __volatile__ (
+            "movss %1, %%xmm0\n\t"         // Load bias into xmm0
+            "xorps %%xmm1, %%xmm1\n\t"     // Zero out accumulator
+            
+            "movq %2, %%rcx\n\t"           // Load input size
+            "shrq $2, %%rcx\n\t"           // Divide by 4 for 4-float chunks
+            "jz 2f\n\t"                    // If no 4-float chunks, skip to remainder
+            
+            "movq $0, %%rax\n\t"           // Initialize index counter
+            
+            "1:\n\t"
+            "movups (%3, %%rax, 4), %%xmm2\n\t"   // Load 4 input floats
+            "movups (%4, %%rax, 4), %%xmm3\n\t"   // Load 4 weight floats
+            "mulps %%xmm2, %%xmm3\n\t"    // Multiply
+            "addps %%xmm3, %%xmm1\n\t"    // Accumulate
+            "addq $4, %%rax\n\t"           // Move to next chunk
+            "decq %%rcx\n\t"               // Decrement chunk counter
+            "jnz 1b\n\t"                   // Repeat if more chunks
+            
+            "2:\n\t"
+            "haddps %%xmm1, %%xmm1\n\t"    // Horizontal sum
+            "haddps %%xmm1, %%xmm1\n\t"
+            "addss %%xmm1, %%xmm0\n\t"     // Add to bias
+            "movss %%xmm0, %0\n\t"         // Store result
+            
+            : "=m" (data->output[i])              // Output operand
+            : "m" (data->biases[i]),              // Input bias
+              "r" ((long long)data->fcInputSize), // Input size (64-bit)
+              "r" (data->fcInput),                // Input array
+              "r" (data->weights[i])              // Weights array
+            : "xmm0", "xmm1", "xmm2", "xmm3", "rax", "rcx", "memory" // Clobbered registers
+        );
     }
    
     return NULL;
@@ -129,61 +158,15 @@ float **scaled_dot_product_attention(float **Q, float **K, float **V, int seqLen
 
     // Apply softmax to scores
     float **attention_weights = (float **)malloc(seqLength * sizeof(float *));
-    // Allocate memory for attention weights
     for (int i = 0; i < seqLength; i++) {
         attention_weights[i] = (float *)malloc(seqLength * sizeof(float));
-    }
-
-    for (int i = 0; i < seqLength; i++) {
-        // Vectorized exponential and sum calculation
-        __m256 sum_exp_vec = _mm256_setzero_ps();
-        
-        // Process 8 elements at a time using AVX2
-        int j;
-        for (j = 0; j <= seqLength - 8; j += 8) {
-            // Load scores
-            __m256 score_vec = _mm256_loadu_ps(&scores[i][j]);
-            
-            // Compute exponential using math library (alternatively, use _mm256_exp_ps if available)
-            __m256 exp_vec = _mm256_set_ps(
-                expf(scores[i][j+7]), expf(scores[i][j+6]), 
-                expf(scores[i][j+5]), expf(scores[i][j+4]),
-                expf(scores[i][j+3]), expf(scores[i][j+2]), 
-                expf(scores[i][j+1]), expf(scores[i][j])
-            );
-            
-            // Store exponential values
-            _mm256_storeu_ps(&attention_weights[i][j], exp_vec);
-            
-            // Accumulate sum of exponentials
-            sum_exp_vec = _mm256_add_ps(sum_exp_vec, exp_vec);
-        }
-        
-        // Horizontal sum of vector
-        __m128 sum_128 = _mm_add_ps(
-            _mm256_extractf128_ps(sum_exp_vec, 0), 
-            _mm256_extractf128_ps(sum_exp_vec, 1)
-        );
-        sum_128 = _mm_hadd_ps(sum_128, sum_128);
-        sum_128 = _mm_hadd_ps(sum_128, sum_128);
-        float sum_exp = _mm_cvtss_f32(sum_128);
-        
-        // Handle remaining elements
-        for (; j < seqLength; j++) {
-            attention_weights[i][j] = expf(scores[i][j]);
+        float sum_exp = 0.0;
+        for (int j = 0; j < seqLength; j++) {
+            attention_weights[i][j] = exp(scores[i][j]);
             sum_exp += attention_weights[i][j];
         }
-        
-        // Vectorized normalization
-        __m256 sum_inv = _mm256_set1_ps(1.0f / sum_exp);
-        for (j = 0; j <= seqLength - 8; j += 8) {
-            __m256 weights_vec = _mm256_loadu_ps(&attention_weights[i][j]);
-            weights_vec = _mm256_mul_ps(weights_vec, sum_inv);
-            _mm256_storeu_ps(&attention_weights[i][j], weights_vec);
-        }
-        
-        // Normalize remaining elements
-        for (; j < seqLength; j++) {
+        // Normalize
+        for (int j = 0; j < seqLength; j++) {
             attention_weights[i][j] /= sum_exp;
         }
     }

@@ -3,7 +3,7 @@ BASE
 
 server: 1.18s per it
 
-gcc -o gpt2 gpt2.c -lm
+gcc -o gpt2 gpt2.c -lm  
 /usr/bin/time -f "Real time: %e seconds" ./gpt2
 
 
@@ -15,10 +15,10 @@ gcc -o gpt2 gpt2.c
 
 IMPROVED
 
-server: 0.562s per it
+server: 0.562s per it (just pthread) / 0.413 sec per it (pthread + assembly embedding) / 0.401 sec per it (pthread + assembly embedding + -fopenmp -O3)
 
 srun -p ece5755 -n 1 -c 8 --mem=1g --pty /bin/bash
-gcc -o gpt2_opt gpt2_opt.c -lm -lpthread -mavx2
+gcc -o gpt2_opt gpt2_opt.c -lm -pthread -msse4.1 -fopenmp -O3
 /usr/bin/time -f "Real time: %e seconds" ./gpt2_opt
 
 
