@@ -3,6 +3,7 @@
 #include <math.h>
 #include <string.h>
 #include <time.h>
+#include <immintrin.h>
 
 #define EPSILON 1e-5
 #define EMBEDDING_SIZE 768   // GPT-2 base model embedding size
@@ -63,7 +64,6 @@ int *positions_for(int *tokens, int seqLength, int past_length);
 
 // Implement the linear layer function
 #include <pthread.h>
-#include <xmmintrin.h>
 
 typedef struct {
     float *fcInput;
@@ -129,35 +129,62 @@ float **scaled_dot_product_attention(float **Q, float **K, float **V, int seqLen
 
     // Apply softmax to scores
     float **attention_weights = (float **)malloc(seqLength * sizeof(float *));
+    // Allocate memory for attention weights
     for (int i = 0; i < seqLength; i++) {
         attention_weights[i] = (float *)malloc(seqLength * sizeof(float));
-        float sum_exp = 0.0;
+    }
 
-        // Vectorized computation of exp(scores[i][j])
-        for (int j = 0; j < seqLength; j += 4) {
-            __m128 scores_vec;
-            if (j + 3 < seqLength) {
-                scores_vec = _mm_loadu_ps(&scores[i][j]);
-                __m128 exp_vec = _mm_set_ps(exp(scores[i][j+3]), exp(scores[i][j+2]), exp(scores[i][j+1]), exp(scores[i][j]));
-                _mm_storeu_ps(&attention_weights[i][j], exp_vec);
-            } else {
-                for (int k = 0; k < seqLength - j; k++) {
-                    attention_weights[i][j + k] = exp(scores[i][j + k]);
-                }
-            }
+    for (int i = 0; i < seqLength; i++) {
+        // Vectorized exponential and sum calculation
+        __m256 sum_exp_vec = _mm256_setzero_ps();
+        
+        // Process 8 elements at a time using AVX2
+        int j;
+        for (j = 0; j <= seqLength - 8; j += 8) {
+            // Load scores
+            __m256 score_vec = _mm256_loadu_ps(&scores[i][j]);
+            
+            // Compute exponential using math library (alternatively, use _mm256_exp_ps if available)
+            __m256 exp_vec = _mm256_set_ps(
+                expf(scores[i][j+7]), expf(scores[i][j+6]), 
+                expf(scores[i][j+5]), expf(scores[i][j+4]),
+                expf(scores[i][j+3]), expf(scores[i][j+2]), 
+                expf(scores[i][j+1]), expf(scores[i][j])
+            );
+            
+            // Store exponential values
+            _mm256_storeu_ps(&attention_weights[i][j], exp_vec);
+            
+            // Accumulate sum of exponentials
+            sum_exp_vec = _mm256_add_ps(sum_exp_vec, exp_vec);
         }
-
-        // Sum the exponentials
-        for (int j = 0; j < seqLength; j++) {
+        
+        // Horizontal sum of vector
+        __m128 sum_128 = _mm_add_ps(
+            _mm256_extractf128_ps(sum_exp_vec, 0), 
+            _mm256_extractf128_ps(sum_exp_vec, 1)
+        );
+        sum_128 = _mm_hadd_ps(sum_128, sum_128);
+        sum_128 = _mm_hadd_ps(sum_128, sum_128);
+        float sum_exp = _mm_cvtss_f32(sum_128);
+        
+        // Handle remaining elements
+        for (; j < seqLength; j++) {
+            attention_weights[i][j] = expf(scores[i][j]);
             sum_exp += attention_weights[i][j];
         }
-
-        // Normalize
-        __m128 sum_exp_vec = _mm_set1_ps(sum_exp);
-        for (int j = 0; j < seqLength; j += 4) {
-            __m128 weights_vec = _mm_loadu_ps(&attention_weights[i][j]);
-            __m128 normalized_vec = _mm_div_ps(weights_vec, sum_exp_vec);
-            _mm_storeu_ps(&attention_weights[i][j], normalized_vec);
+        
+        // Vectorized normalization
+        __m256 sum_inv = _mm256_set1_ps(1.0f / sum_exp);
+        for (j = 0; j <= seqLength - 8; j += 8) {
+            __m256 weights_vec = _mm256_loadu_ps(&attention_weights[i][j]);
+            weights_vec = _mm256_mul_ps(weights_vec, sum_inv);
+            _mm256_storeu_ps(&attention_weights[i][j], weights_vec);
+        }
+        
+        // Normalize remaining elements
+        for (; j < seqLength; j++) {
+            attention_weights[i][j] /= sum_exp;
         }
     }
 
