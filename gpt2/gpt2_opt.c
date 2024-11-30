@@ -135,9 +135,16 @@ float **scaled_dot_product_attention(float **Q, float **K, float **V, int seqLen
 
         // Vectorized computation of exp(scores[i][j])
         for (int j = 0; j < seqLength; j += 4) {
-            __m128 scores_vec = _mm_loadu_ps(&scores[i][j]);
-            __m128 exp_vec = _mm_set_ps(exp(scores[i][j+3]), exp(scores[i][j+2]), exp(scores[i][j+1]), exp(scores[i][j])); // Manually compute exp
-            _mm_storeu_ps(&attention_weights[i][j], exp_vec);
+            __m128 scores_vec;
+            if (j + 3 < seqLength) {
+                scores_vec = _mm_loadu_ps(&scores[i][j]);
+                __m128 exp_vec = _mm_set_ps(exp(scores[i][j+3]), exp(scores[i][j+2]), exp(scores[i][j+1]), exp(scores[i][j]));
+                _mm_storeu_ps(&attention_weights[i][j], exp_vec);
+            } else {
+                for (int k = 0; k < seqLength - j; k++) {
+                    attention_weights[i][j + k] = exp(scores[i][j + k]);
+                }
+            }
         }
 
         // Sum the exponentials
