@@ -3,6 +3,7 @@
 #include <math.h>
 #include <string.h>
 #include <time.h>
+#include <xmmintrin.h>
 
 #define EPSILON 1e-5
 #define EMBEDDING_SIZE 768   // GPT-2 base model embedding size
@@ -112,15 +113,28 @@ float *linear(float *fcInput, float **weights, float *biases, int fcInputSize, i
 
 // Implement the scaled dot-product attention
 float **scaled_dot_product_attention(float **Q, float **K, float **V, int seqLength, int depth) {
-    // Compute Q * K^T
+    // Compute Q * K^T using SIMD
     float **scores = (float **)malloc(seqLength * sizeof(float *));
     for (int i = 0; i < seqLength; i++) {
         scores[i] = (float *)malloc(seqLength * sizeof(float));
         for (int j = 0; j < seqLength; j++) {
-            float sum = 0.0;
-            for (int k = 0; k < depth; k++) {
-                sum += Q[i][k] * K[j][k];
+            __m128 sum_vec = _mm_setzero_ps();
+            
+            // Vectorized dot product computation
+            for (int k = 0; k < depth; k += 4) {
+                __m128 q_vec = _mm_loadu_ps(&Q[i][k]);
+                __m128 k_vec = _mm_loadu_ps(&K[j][k]);
+                __m128 prod_vec = _mm_mul_ps(q_vec, k_vec);
+                sum_vec = _mm_add_ps(sum_vec, prod_vec);
             }
+            
+            // Horizontal sum of the SIMD vector
+            __m128 shuf = _mm_shuffle_ps(sum_vec, sum_vec, _MM_SHUFFLE(2, 3, 0, 1));
+            __m128 sums = _mm_add_ps(sum_vec, shuf);
+            shuf = _mm_movehl_ps(shuf, sums);
+            sums = _mm_add_ss(sums, shuf);
+            float sum = _mm_cvtss_f32(sums);
+            
             scores[i][j] = sum / sqrt(depth);
         }
     }
