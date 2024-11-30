@@ -3,7 +3,6 @@
 #include <math.h>
 #include <string.h>
 #include <time.h>
-#include <xmmintrin.h>
 
 #define EPSILON 1e-5
 #define EMBEDDING_SIZE 768   // GPT-2 base model embedding size
@@ -64,6 +63,7 @@ int *positions_for(int *tokens, int seqLength, int past_length);
 
 // Implement the linear layer function
 #include <pthread.h>
+#include <xmmintrin.h>
 
 typedef struct {
     float *fcInput;
@@ -83,6 +83,7 @@ void *linear_thread(void *arg) {
             data->output[i] += data->fcInput[j] * data->weights[i][j];
         }
     }
+   
     return NULL;
 }
 
@@ -113,28 +114,15 @@ float *linear(float *fcInput, float **weights, float *biases, int fcInputSize, i
 
 // Implement the scaled dot-product attention
 float **scaled_dot_product_attention(float **Q, float **K, float **V, int seqLength, int depth) {
-    // Compute Q * K^T using SIMD
+    // Compute Q * K^T
     float **scores = (float **)malloc(seqLength * sizeof(float *));
     for (int i = 0; i < seqLength; i++) {
         scores[i] = (float *)malloc(seqLength * sizeof(float));
         for (int j = 0; j < seqLength; j++) {
-            __m128 sum_vec = _mm_setzero_ps();
-            
-            // Vectorized dot product computation
-            for (int k = 0; k < depth; k += 4) {
-                __m128 q_vec = _mm_loadu_ps(&Q[i][k]);
-                __m128 k_vec = _mm_loadu_ps(&K[j][k]);
-                __m128 prod_vec = _mm_mul_ps(q_vec, k_vec);
-                sum_vec = _mm_add_ps(sum_vec, prod_vec);
+            float sum = 0.0;
+            for (int k = 0; k < depth; k++) {
+                sum += Q[i][k] * K[j][k];
             }
-            
-            // Horizontal sum of the SIMD vector
-            __m128 shuf = _mm_shuffle_ps(sum_vec, sum_vec, _MM_SHUFFLE(2, 3, 0, 1));
-            __m128 sums = _mm_add_ps(sum_vec, shuf);
-            shuf = _mm_movehl_ps(shuf, sums);
-            sums = _mm_add_ss(sums, shuf);
-            float sum = _mm_cvtss_f32(sums);
-            
             scores[i][j] = sum / sqrt(depth);
         }
     }
@@ -144,13 +132,25 @@ float **scaled_dot_product_attention(float **Q, float **K, float **V, int seqLen
     for (int i = 0; i < seqLength; i++) {
         attention_weights[i] = (float *)malloc(seqLength * sizeof(float));
         float sum_exp = 0.0;
+
+        // Vectorized computation of exp(scores[i][j])
+        for (int j = 0; j < seqLength; j += 4) {
+            __m128 scores_vec = _mm_loadu_ps(&scores[i][j]);
+            __m128 exp_vec = _mm_set_ps(exp(scores[i][j+3]), exp(scores[i][j+2]), exp(scores[i][j+1]), exp(scores[i][j])); // Manually compute exp
+            _mm_storeu_ps(&attention_weights[i][j], exp_vec);
+        }
+
+        // Sum the exponentials
         for (int j = 0; j < seqLength; j++) {
-            attention_weights[i][j] = exp(scores[i][j]);
             sum_exp += attention_weights[i][j];
         }
+
         // Normalize
-        for (int j = 0; j < seqLength; j++) {
-            attention_weights[i][j] /= sum_exp;
+        __m128 sum_exp_vec = _mm_set1_ps(sum_exp);
+        for (int j = 0; j < seqLength; j += 4) {
+            __m128 weights_vec = _mm_loadu_ps(&attention_weights[i][j]);
+            __m128 normalized_vec = _mm_div_ps(weights_vec, sum_exp_vec);
+            _mm_storeu_ps(&attention_weights[i][j], normalized_vec);
         }
     }
 
